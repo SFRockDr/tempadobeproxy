@@ -1,6 +1,6 @@
 // /api/proxy.js
 import * as cheerio from 'cheerio';
-// import TurndownService from 'turndown'; // Comment out temporarily
+import TurndownService from 'turndown';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -59,16 +59,19 @@ export default async function handler(req, res) {
         });
       }
       
+      // Remove table of contents and navigation elements
+      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb').remove();
+      
       let content = contentElement.html();
       
       // Convert to markdown if requested
       if (markdown) {
-        // TODO: Add markdown conversion back
-        return res.json({ 
-          error: 'Markdown conversion temporarily disabled - install turndown first',
-          content: content.substring(0, 500) + '...',
-          instructions: 'Add turndown to package.json and redeploy'
+        const turndown = new TurndownService({
+          headingStyle: 'atx',
+          codeBlockStyle: 'fenced',
+          bulletListMarker: '-'
         });
+        content = turndown.turndown(content);
       }
       
       return res.json({ 
