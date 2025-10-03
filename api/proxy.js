@@ -56,12 +56,14 @@ export default async function handler(req, res) {
       
       // Try multiple selectors for different Adobe Help page types
       const selectors = [
-        '.dexter-FlexContainer-Items',  // Works for InDesign pages
-        '.responsivegrid .aem-Grid',     // Try for Photoshop Web pages
-        'main .aem-Grid',               // Alternative main content
-        '.content .aem-Grid',           // Another alternative
-        'main',                         // Fallback to main element
-        '.content'                      // Final fallback
+        '.dexter-FlexContainer-Items',                    // Works for InDesign pages
+        '#helpxNext-article-right-rail .responsivegrid', // Photoshop Web main content
+        'main .responsivegrid',                          // Alternative Photoshop content
+        '.titleBar + .responsivegrid',                   // Content after title bar
+        '.page-title + .responsivegrid',                 // Content after page title
+        '.responsivegrid .text',                         // Text content areas
+        'main',                                          // Fallback to main element
+        '.content'                                       // Final fallback
       ];
       
       let contentElement = null;
@@ -84,8 +86,10 @@ export default async function handler(req, res) {
         });
       }
       
+      console.log(`Using selector: ${usedSelector}`);
+      
       // Remove table of contents, navigation, images, and other unwanted elements
-      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb, style, .dexter-Spacer, .planCard, .plan-card, .xfreference, .rightRailXf, .viewportSpecificContainer, img, picture, .image, .video, iframe').remove();
+      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb, style, .dexter-Spacer, .planCard, .plan-card, .xfreference, .rightRailXf, .viewportSpecificContainer, img, picture, .image, .video, iframe, .productbadge, .search, .actionItems, .tocmobile, .globalnavheader, .globalNavHeader, .flex_top_nav, script').remove();
       
       let content = contentElement.html();
       
