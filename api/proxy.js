@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url, selector = '#position', markdown } = req.query;
+  const { url, selector = 'main', markdown } = req.query;
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
