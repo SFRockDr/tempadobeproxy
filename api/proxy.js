@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url } = req.query; // Removed markdown parameter since it's no longer used
+  const { url, markdown } = req.query; // Added back markdown parameter
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       
       let content = contentElement.html();
       
-      // Always convert to plain text (no more markdown parameter)
+      // Always convert to markdown first
       const turndown = new TurndownService({
         headingStyle: 'atx',
         codeBlockStyle: 'fenced',
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
         /^## Have a question or an idea.*/ms,
         /^## More like this.*/ms,
         /^### Talk to us.*/ms,
-        /^### Related resources.*/ms, // New cutoff pattern
+        /^### Related resources.*/ms,
         /^Have a question or an idea.*/ms,
         /^More like this.*/ms
       ];
@@ -88,25 +88,32 @@ export default async function handler(req, res) {
         }
       }
       
-      // Convert markdown to plain text with explicit separators
-      content = content.replace(/^#+ (.+)$/gm, '\n\n--- $1 ---\n\n'); // Convert headers to section dividers
-      content = content.replace(/^\* (.+)$/gm, '• $1'); // Convert bullet points
-      content = content.replace(/^\d+\. (.+)$/gm, '$1'); // Remove numbering, keep text
-      content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Remove markdown links, keep text
-      content = content.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold markdown
-      content = content.replace(/\*([^*]+)\*/g, '$1'); // Remove italic markdown
-      content = content.replace(/`([^`]+)`/g, '$1'); // Remove code markdown
-      
-      // Clean up spacing
-      content = content.replace(/\n{3,}/g, '\n\n'); // Collapse excessive newlines
-      content = content.replace(/^\s+|\s+$/g, ''); // Trim whitespace
-      
-      // Replace newlines with space for systems that strip formatting
-      content = content.replace(/\n/g, ' ');
-      content = content.replace(/\s+/g, ' '); // Normalize multiple spaces
-      
-      // Add leading space at the very beginning
-      content = ' ' + content;
+      // If markdown parameter is NOT provided, convert to plain text
+      if (!markdown) {
+        // Convert markdown to plain text with explicit separators
+        content = content.replace(/^#+ (.+)$/gm, '\n\n--- $1 ---\n\n'); // Convert headers to section dividers
+        content = content.replace(/^\* (.+)$/gm, '• $1'); // Convert bullet points
+        content = content.replace(/^\d+\. (.+)$/gm, '$1'); // Remove numbering, keep text
+        content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Remove markdown links, keep text
+        content = content.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold markdown
+        content = content.replace(/\*([^*]+)\*/g, '$1'); // Remove italic markdown
+        content = content.replace(/`([^`]+)`/g, '$1'); // Remove code markdown
+        
+        // Clean up spacing
+        content = content.replace(/\n{3,}/g, '\n\n'); // Collapse excessive newlines
+        content = content.replace(/^\s+|\s+$/g, ''); // Trim whitespace
+        
+        // Replace newlines with space for systems that strip formatting
+        content = content.replace(/\n/g, ' ');
+        content = content.replace(/\s+/g, ' '); // Normalize multiple spaces
+        
+        // Add leading space at the very beginning
+        content = ' ' + content;
+      } else {
+        // Keep as valid markdown - just clean up formatting
+        content = content.replace(/\n{3,}/g, '\n\n'); // Collapse excessive newlines
+        content = content.trim(); // Remove leading/trailing whitespace
+      }
       
       // Return simplified payload - just the clean text content
       return res.json({ 
