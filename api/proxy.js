@@ -1,6 +1,5 @@
 // /api/proxy.js
 const cheerio = require('cheerio');
-const TurndownService = require('turndown');
 
 module.exports = async function handler(req, res) {
   // Enable CORS
@@ -12,7 +11,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url, selector = '#position', markdown } = req.query;
+  const { url } = req.query;
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
@@ -20,70 +19,36 @@ module.exports = async function handler(req, res) {
   
   try {
     const fullUrl = `https://helpx.adobe.com/${url}`;
-    console.log('Attempting to fetch:', fullUrl);
+    console.log('Fetching:', fullUrl);
     
-    // Fetch the Adobe page
-    const response = await fetch(fullUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Cache-Control': 'max-age=0'
-      }
-    });
+    // Simple fetch first
+    const response = await fetch(fullUrl);
+    console.log('Response status:', response.status);
     
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return res.json({ 
+        error: `HTTP ${response.status}`,
+        url: fullUrl,
+        statusText: response.statusText
+      });
     }
     
     const html = await response.text();
-    const $ = cheerio.load(html);
+    console.log('HTML length:', html.length);
     
-    // Extract content from specified selector
-    const contentElement = $(selector);
-    
-    if (contentElement.length === 0) {
-      return res.status(404).json({ 
-        error: `No content found with selector: ${selector}`,
-        availableSelectors: $('div[id], div[class]').map((i, el) => ({
-          tag: el.tagName,
-          id: el.attribs.id,
-          class: el.attribs.class
-        })).get().slice(0, 10) // Show first 10 for debugging
-      });
-    }
-    
-    let content = contentElement.html();
-    
-    // Convert to markdown if requested
-    if (markdown) {
-      const turndown = new TurndownService({
-        headingStyle: 'atx',
-        codeBlockStyle: 'fenced'
-      });
-      content = turndown.turndown(content);
-    }
-    
+    // Just return basic info for now
     res.json({ 
-      content,
-      url: `https://helpx.adobe.com/${url}`,
-      selector,
-      format: markdown ? 'markdown' : 'html'
+      success: true,
+      url: fullUrl,
+      htmlLength: html.length,
+      preview: html.substring(0, 200)
     });
     
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Error:', error);
     res.status(500).json({ 
       error: error.message,
-      errorCode: error.code,
-      cause: error.cause?.message,
+      stack: error.stack,
       url: `https://helpx.adobe.com/${url}`
     });
   }
