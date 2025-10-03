@@ -61,33 +61,47 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('Direct fetch failed, trying proxy:', error.message);
+    console.error('Direct fetch failed:', error.message);
     
-    // Fallback: Try using a public proxy
+    // Try ScrapeOwl as fallback
     try {
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}`;
-      const proxyResponse = await fetch(proxyUrl);
-      const proxyData = await proxyResponse.json();
+      const SCRAPEOWL_API_KEY = process.env.SCRAPEOWL_API_KEY;
       
-      if (proxyData.contents) {
-        const html = proxyData.contents;
+      if (!SCRAPEOWL_API_KEY) {
+        throw new Error('SCRAPEOWL_API_KEY not configured');
+      }
+      
+      console.log('Trying ScrapeOwl...');
+      const scrapeOwlUrl = `https://api.scrapeowl.com/v1/scrape?api_key=${SCRAPEOWL_API_KEY}&url=${encodeURIComponent(fullUrl)}&elements=%23position,.main-content,article,.content`;
+      
+      const scrapeResponse = await fetch(scrapeOwlUrl);
+      const scrapeData = await scrapeResponse.json();
+      
+      if (scrapeData.html) {
         return res.json({ 
           success: true,
           url: fullUrl,
-          htmlLength: html.length,
-          preview: html.substring(0, 200),
-          method: 'proxy'
+          htmlLength: scrapeData.html.length,
+          preview: scrapeData.html.substring(0, 200),
+          method: 'scrapeowl'
         });
+      } else {
+        throw new Error('ScrapeOwl returned no HTML');
       }
-    } catch (proxyError) {
-      console.error('Proxy also failed:', proxyError.message);
+      
+    } catch (scrapeError) {
+      console.error('ScrapeOwl failed:', scrapeError.message);
     }
     
+    // All methods failed
     res.status(500).json({ 
-      error: error.message,
-      stack: error.stack,
-      url: fullUrl,
-      suggestion: "Adobe may be blocking server requests. Try using a headless browser service like Puppeteer."
+      error: 'All fetch methods failed. Adobe is blocking automated access.',
+      suggestions: [
+        'Add SCRAPEOWL_API_KEY to Vercel environment variables',
+        'Try ScrapingBee as alternative',
+        'Use Puppeteer with chrome-aws-lambda'
+      ],
+      url: fullUrl
     });
   }
 };;
