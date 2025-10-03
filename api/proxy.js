@@ -54,9 +54,29 @@ export default async function handler(req, res) {
         title = 'Untitled';
       }
       
-      const contentElement = $('.dexter-FlexContainer-Items'); // Hardcoded Adobe Help selector
+      // Try multiple selectors for different Adobe Help page types
+      const selectors = [
+        '.dexter-FlexContainer-Items',  // Works for InDesign pages
+        '.responsivegrid .aem-Grid',     // Try for Photoshop Web pages
+        'main .aem-Grid',               // Alternative main content
+        '.content .aem-Grid',           // Another alternative
+        'main',                         // Fallback to main element
+        '.content'                      // Final fallback
+      ];
       
-      if (contentElement.length === 0) {
+      let contentElement = null;
+      let usedSelector = '';
+      
+      for (const selector of selectors) {
+        const testElement = $(selector);
+        if (testElement.length > 0) {
+          contentElement = testElement.first();
+          usedSelector = selector;
+          break;
+        }
+      }
+      
+      if (!contentElement || contentElement.length === 0) {
         return res.status(404).json({ 
           error: 'No Adobe Help article content found on this page',
           url: fullUrl,
