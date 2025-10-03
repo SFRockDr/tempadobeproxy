@@ -17,8 +17,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'URL parameter required' });
   }
   
+  const fullUrl = `https://helpx.adobe.com/${url}`;
+  
   try {
-    const fullUrl = `https://helpx.adobe.com/${url}`;
     console.log('Fetching:', fullUrl);
     
     // Try with more realistic browser headers
