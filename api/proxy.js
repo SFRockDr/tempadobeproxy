@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url, selector = 'main', markdown } = req.query;
+  const { url, markdown } = req.query;
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
@@ -42,25 +42,20 @@ export default async function handler(req, res) {
     console.log('ScrapeOwl response keys:', Object.keys(scrapeData));
     
     if (scrapeData.html) {
-      // Parse the HTML and extract the specific content
+      // Parse the HTML and extract Adobe Help article content
       const $ = cheerio.load(scrapeData.html);
-      const contentElement = $(selector);
+      const contentElement = $('.dexter-FlexContainer-Items'); // Hardcoded Adobe Help selector
       
       if (contentElement.length === 0) {
         return res.status(404).json({ 
-          error: `No content found with selector: ${selector}`,
-          availableSelectors: $('div[id], div[class], main, article, section').map((i, el) => ({
-            tag: el.tagName,
-            id: el.attribs.id,
-            class: el.attribs.class?.split(' ')[0] // Just first class
-          })).get().slice(0, 15), // Show first 15 for debugging
+          error: 'No Adobe Help article content found on this page',
           url: fullUrl,
           method: 'scrapeowl'
         });
       }
       
-      // Remove table of contents and navigation elements
-      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb').remove();
+      // Remove table of contents, navigation, and other unwanted elements
+      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb, style, .dexter-Spacer, .planCard, .plan-card, .xfreference, .rightRailXf, .viewportSpecificContainer').remove();
       
       let content = contentElement.html();
       
@@ -69,15 +64,22 @@ export default async function handler(req, res) {
         const turndown = new TurndownService({
           headingStyle: 'atx',
           codeBlockStyle: 'fenced',
-          bulletListMarker: '-'
+          bulletListMarker: '-',
+          // Remove style tags and clean up
+          remove: ['style', 'script']
         });
+        
         content = turndown.turndown(content);
+        
+        // Clean up any remaining CSS/style artifacts
+        content = content.replace(/^#[^\n]*\{[^}]*\}$/gm, ''); // Remove CSS blocks
+        content = content.replace(/^\s*$/gm, ''); // Remove empty lines
+        content = content.replace(/\n{3,}/g, '\n\n'); // Collapse multiple newlines
       }
       
       return res.json({ 
         success: true,
         url: fullUrl,
-        selector,
         format: markdown ? 'markdown' : 'html',
         contentLength: content.length,
         content,
