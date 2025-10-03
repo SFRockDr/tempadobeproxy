@@ -63,25 +63,44 @@ export default async function handler(req, res) {
                                   $('#root_content_flex').length ||
                                   $('.TableOfContents').length;
 
+    console.log(`Template detection: HelpNext=${helpNextIndicators}, LegacyHelpX=${legacyHelpXIndicators}`);
+
     if (helpNextIndicators) {
       templateType = 'HelpNext';
       console.log('Detected HelpNext template');
       
-      // Try HelpNext-specific selectors in order of preference
-      const helpNextSelectors = [
-        '#helpxNext-article-right-rail .responsivegrid',
-        'main .content .responsivegrid', 
-        '.titleBar ~ .responsivegrid',
-        'main .responsivegrid'
+      // For HelpNext, try to get the main article content area
+      let potentialElements = [
+        $('#helpxNext-article-right-rail .responsivegrid'),
+        $('.content .responsivegrid'),
+        $('main .responsivegrid'),
+        $('.aem-Grid .responsivegrid')
       ];
       
-      for (const selector of helpNextSelectors) {
-        const element = $(selector).first();
-        if (element.length && element.text().trim().length > 200) {
-          contentElement = element;
-          console.log(`Using HelpNext selector: ${selector}`);
-          break;
+      // Find the element with the most substantial text content
+      let bestElement = null;
+      let maxTextLength = 0;
+      
+      potentialElements.forEach((element, index) => {
+        if (element.length) {
+          // Create a copy and clean it up to test content quality
+          const testElement = element.clone();
+          testElement.find('nav, .toc, .breadcrumb, .search, .titleBar, .globalnavheader').remove();
+          const textLength = testElement.text().trim().length;
+          
+          console.log(`HelpNext selector ${index}: found ${element.length} elements, text length: ${textLength}`);
+          
+          if (textLength > maxTextLength && textLength > 200) {
+            maxTextLength = textLength;
+            bestElement = element;
+            console.log(`New best element found with ${textLength} characters`);
+          }
         }
+      });
+      
+      if (bestElement && bestElement.length) {
+        contentElement = bestElement;
+        console.log(`Using HelpNext element with ${maxTextLength} characters`);
       }
       
     } else if (legacyHelpXIndicators) {
@@ -231,7 +250,11 @@ export default async function handler(req, res) {
       response.debug = {
         templateType,
         finalTextLength,
-        url: fullUrl
+        url: fullUrl,
+        helpNextIndicators,
+        legacyHelpXIndicators,
+        contentFoundLength: contentElement ? contentElement.length : 0,
+        rawContentLength: contentElement ? contentElement.text().length : 0
       };
     }
 
