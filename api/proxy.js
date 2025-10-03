@@ -54,8 +54,8 @@ export default async function handler(req, res) {
         });
       }
       
-      // Remove table of contents, navigation, and other unwanted elements
-      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb, style, .dexter-Spacer, .planCard, .plan-card, .xfreference, .rightRailXf, .viewportSpecificContainer').remove();
+      // Remove table of contents, navigation, images, and other unwanted elements
+      contentElement.find('.toc, .TableOfContents, nav, .nav, .breadcrumb, style, .dexter-Spacer, .planCard, .plan-card, .xfreference, .rightRailXf, .viewportSpecificContainer, img, picture, .image, .video, iframe').remove();
       
       let content = contentElement.html();
       
@@ -65,25 +65,23 @@ export default async function handler(req, res) {
           headingStyle: 'atx',
           codeBlockStyle: 'fenced',
           bulletListMarker: '-',
-          // Remove style tags and clean up
-          remove: ['style', 'script']
+          // Remove style tags, scripts, and images
+          remove: ['style', 'script', 'img', 'picture', 'iframe']
         });
         
         content = turndown.turndown(content);
         
-        // Clean up any remaining CSS/style artifacts
+        // Clean up any remaining artifacts
         content = content.replace(/^#[^\n]*\{[^}]*\}$/gm, ''); // Remove CSS blocks
+        content = content.replace(/!\[.*?\]\(.*?\)/g, ''); // Remove markdown images
         content = content.replace(/^\s*$/gm, ''); // Remove empty lines
         content = content.replace(/\n{3,}/g, '\n\n'); // Collapse multiple newlines
+        content = content.trim(); // Remove leading/trailing whitespace
       }
       
+      // Return simplified payload - just the clean text content
       return res.json({ 
-        success: true,
-        url: fullUrl,
-        format: markdown ? 'markdown' : 'html',
-        contentLength: content.length,
-        content,
-        method: 'scrapeowl'
+        content: content
       });
     } else {
       return res.status(500).json({
