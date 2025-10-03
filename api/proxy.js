@@ -88,20 +88,23 @@ export default async function handler(req, res) {
           }
         }
         
-        // Clean up and normalize formatting
-        content = content.replace(/^#[^\n]*\{[^}]*\}$/gm, ''); // Remove CSS blocks
-        content = content.replace(/!\[.*?\]\(.*?\)/g, ''); // Remove markdown images
-        content = content.replace(/\s+/g, ' '); // Normalize multiple spaces to single space
-        content = content.replace(/\n\s*\n/g, '\n\n'); // Ensure proper paragraph breaks
-        content = content.replace(/([.!?])\s*([A-Z])/g, '$1 $2'); // Ensure space after sentences
-        content = content.replace(/([a-z])([A-Z])/g, '$1 $2'); // Add space between camelCase
+        // Convert markdown to plain text with explicit separators
+        content = content.replace(/^#+ (.+)$/gm, '\n\n--- $1 ---\n\n'); // Convert headers to section dividers
+        content = content.replace(/^\* (.+)$/gm, '• $1'); // Convert bullet points
+        content = content.replace(/^\d+\. (.+)$/gm, '$1'); // Remove numbering, keep text
+        content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Remove markdown links, keep text
+        content = content.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold markdown
+        content = content.replace(/\*([^*]+)\*/g, '$1'); // Remove italic markdown
+        content = content.replace(/`([^`]+)`/g, '$1'); // Remove code markdown
+        
+        // Clean up spacing
         content = content.replace(/\n{3,}/g, '\n\n'); // Collapse excessive newlines
         content = content.replace(/^\s+|\s+$/g, ''); // Trim whitespace
         
-        // Add proper spacing around headers
-        content = content.replace(/^(#{1,6}\s+.+)$/gm, '\n$1\n');
-        content = content.replace(/^\n+/g, ''); // Remove leading newlines
-        content = content.replace(/\n+$/g, ''); // Remove trailing newlines
+        // Replace newlines with space for systems that strip formatting
+        content = content.replace(/\n/g, ' ');
+        content = content.replace(/\s+/g, ' '); // Normalize multiple spaces
+        
       }
       
       // Return simplified payload - just the clean text content
