@@ -43,11 +43,35 @@ export default async function handler(req, res) {
 
     const $ = cheerio.load(scrapeData.html);
     
-    // Extract title
+    // Extract title and metadata
     let title = $('h1').first().text().trim() || 
                 $('.page-title').text().trim() ||
                 $('title').text().replace(/\s*[|\-].*$/i, '').trim() ||
                 'Untitled Article';
+
+    // Extract SEO metadata
+    const seoTitle = $('meta[name="title"]').attr('content') || 
+                     $('meta[property="og:title"]').attr('content') || 
+                     $('title').text().trim() || 
+                     title;
+
+    const seoDescription = $('meta[name="description"]').attr('content') || 
+                          $('meta[property="og:description"]').attr('content') || 
+                          '';
+
+    // Extract publish date - try multiple possible meta tag names
+    const publishDate = $('meta[name="publishDate"]').attr('content') ||
+                       $('meta[name="publishExternalUrl"]').attr('content') ||
+                       $('meta[name="lastModifiedDate"]').attr('content') ||
+                       $('meta[name="firstPublishedLive"]').attr('content') ||
+                       $('meta[property="article:published_time"]').attr('content') ||
+                       '';
+
+    // Extract other useful metadata
+    const keywords = $('meta[name="keywords"]').attr('content') || '';
+    const contentType = $('meta[name="content-type"]').attr('content') || '';
+    const primaryProduct = $('meta[name="primaryProduct"]').attr('content') || 
+                           $('meta[name="primaryProductName"]').attr('content') || '';
 
     // Detect template type and extract content accordingly
     let contentElement;
@@ -243,7 +267,15 @@ export default async function handler(req, res) {
 
     const response = { 
       title: title.substring(0, 200),
-      content: content
+      content: content,
+      metadata: {
+        seoTitle: seoTitle.substring(0, 300),
+        seoDescription: seoDescription.substring(0, 500),
+        publishDate: publishDate,
+        keywords: keywords.substring(0, 200),
+        contentType: contentType,
+        primaryProduct: primaryProduct
+      }
     };
 
     if (debug) {
