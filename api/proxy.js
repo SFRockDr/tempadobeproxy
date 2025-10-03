@@ -1,6 +1,6 @@
 // /api/proxy.js
 import * as cheerio from 'cheerio';
-import TurndownService from 'turndown';
+// import TurndownService from 'turndown'; // Comment out temporarily
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -63,12 +63,12 @@ export default async function handler(req, res) {
       
       // Convert to markdown if requested
       if (markdown) {
-        const turndown = new TurndownService({
-          headingStyle: 'atx',
-          codeBlockStyle: 'fenced',
-          bulletListMarker: '-'
+        // TODO: Add markdown conversion back
+        return res.json({ 
+          error: 'Markdown conversion temporarily disabled - install turndown first',
+          content: content.substring(0, 500) + '...',
+          instructions: 'Add turndown to package.json and redeploy'
         });
-        content = turndown.turndown(content);
       }
       
       return res.json({ 
