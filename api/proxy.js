@@ -44,6 +44,16 @@ export default async function handler(req, res) {
     if (scrapeData.html) {
       // Parse the HTML and extract Adobe Help article content
       const $ = cheerio.load(scrapeData.html);
+      
+      // Extract title from h1 or title tag
+      let title = $('h1').first().text().trim();
+      if (!title) {
+        title = $('title').text().trim();
+      }
+      if (!title) {
+        title = 'Untitled';
+      }
+      
       const contentElement = $('.dexter-FlexContainer-Items'); // Hardcoded Adobe Help selector
       
       if (contentElement.length === 0) {
@@ -115,8 +125,9 @@ export default async function handler(req, res) {
         content = content.trim(); // Remove leading/trailing whitespace
       }
       
-      // Return simplified payload - just the clean text content
+      // Return simplified payload with title
       return res.json({ 
+        title: title,
         content: content
       });
     } else {
