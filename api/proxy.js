@@ -19,88 +19,47 @@ export default async function handler(req, res) {
   
   const fullUrl = `https://helpx.adobe.com/${url}`;
   
+  // Check if ScrapeOwl key exists
+  const SCRAPEOWL_API_KEY = process.env.SCRAPEOWL_API_KEY;
+  console.log('ScrapeOwl key exists:', !!SCRAPEOWL_API_KEY);
+  
+  // Skip direct fetch, go straight to ScrapeOwl for testing
   try {
-    console.log('Fetching:', fullUrl);
-    
-    // Try with more realistic browser headers
-    const response = await fetch(fullUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      },
-      timeout: 10000
-    });
-    console.log('Response status:', response.status);
-    
-    if (!response.ok) {
-      return res.json({ 
-        error: `HTTP ${response.status}`,
-        url: fullUrl,
-        statusText: response.statusText
+    if (!SCRAPEOWL_API_KEY) {
+      return res.status(500).json({ 
+        error: 'SCRAPEOWL_API_KEY not configured in Vercel environment variables' 
       });
     }
     
-    const html = await response.text();
-    console.log('HTML length:', html.length);
+    console.log('Using ScrapeOwl for:', fullUrl);
+    const scrapeOwlUrl = `https://api.scrapeowl.com/v1/scrape?api_key=${SCRAPEOWL_API_KEY}&url=${encodeURIComponent(fullUrl)}`;
     
-    // Just return basic info for now
-    res.json({ 
-      success: true,
-      url: fullUrl,
-      htmlLength: html.length,
-      preview: html.substring(0, 200)
-    });
+    const scrapeResponse = await fetch(scrapeOwlUrl);
+    console.log('ScrapeOwl response status:', scrapeResponse.status);
     
-  } catch (error) {
-    console.error('Direct fetch failed:', error.message);
+    const scrapeData = await scrapeResponse.json();
+    console.log('ScrapeOwl response keys:', Object.keys(scrapeData));
     
-    // Try ScrapeOwl as fallback
-    try {
-      const SCRAPEOWL_API_KEY = process.env.SCRAPEOWL_API_KEY;
-      
-      if (!SCRAPEOWL_API_KEY) {
-        throw new Error('SCRAPEOWL_API_KEY not configured');
-      }
-      
-      console.log('Trying ScrapeOwl...');
-      const scrapeOwlUrl = `https://api.scrapeowl.com/v1/scrape?api_key=${SCRAPEOWL_API_KEY}&url=${encodeURIComponent(fullUrl)}&elements=%23position,.main-content,article,.content`;
-      
-      const scrapeResponse = await fetch(scrapeOwlUrl);
-      const scrapeData = await scrapeResponse.json();
-      
-      if (scrapeData.html) {
-        return res.json({ 
-          success: true,
-          url: fullUrl,
-          htmlLength: scrapeData.html.length,
-          preview: scrapeData.html.substring(0, 200),
-          method: 'scrapeowl'
-        });
-      } else {
-        throw new Error('ScrapeOwl returned no HTML');
-      }
-      
-    } catch (scrapeError) {
-      console.error('ScrapeOwl failed:', scrapeError.message);
+    if (scrapeData.html) {
+      return res.json({ 
+        success: true,
+        url: fullUrl,
+        htmlLength: scrapeData.html.length,
+        preview: scrapeData.html.substring(0, 200),
+        method: 'scrapeowl'
+      });
+    } else {
+      return res.status(500).json({
+        error: 'ScrapeOwl returned no HTML',
+        response: scrapeData
+      });
     }
     
-    // All methods failed
-    res.status(500).json({ 
-      error: 'All fetch methods failed. Adobe is blocking automated access.',
-      suggestions: [
-        'Add SCRAPEOWL_API_KEY to Vercel environment variables',
-        'Try ScrapingBee as alternative',
-        'Use Puppeteer with chrome-aws-lambda'
-      ],
+  } catch (error) {
+    console.error('ScrapeOwl error:', error);
+    return res.status(500).json({ 
+      error: error.message,
+      stack: error.stack,
       url: fullUrl
     });
   }
