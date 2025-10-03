@@ -1,5 +1,6 @@
 // /api/proxy.js
 import * as cheerio from 'cheerio';
+import TurndownService from 'turndown';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url } = req.query;
+  const { url, selector = '#position', markdown } = req.query;
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
@@ -41,11 +42,42 @@ export default async function handler(req, res) {
     console.log('ScrapeOwl response keys:', Object.keys(scrapeData));
     
     if (scrapeData.html) {
+      // Parse the HTML and extract the specific content
+      const $ = cheerio.load(scrapeData.html);
+      const contentElement = $(selector);
+      
+      if (contentElement.length === 0) {
+        return res.status(404).json({ 
+          error: `No content found with selector: ${selector}`,
+          availableSelectors: $('div[id], div[class], main, article, section').map((i, el) => ({
+            tag: el.tagName,
+            id: el.attribs.id,
+            class: el.attribs.class?.split(' ')[0] // Just first class
+          })).get().slice(0, 15), // Show first 15 for debugging
+          url: fullUrl,
+          method: 'scrapeowl'
+        });
+      }
+      
+      let content = contentElement.html();
+      
+      // Convert to markdown if requested
+      if (markdown) {
+        const turndown = new TurndownService({
+          headingStyle: 'atx',
+          codeBlockStyle: 'fenced',
+          bulletListMarker: '-'
+        });
+        content = turndown.turndown(content);
+      }
+      
       return res.json({ 
         success: true,
         url: fullUrl,
-        htmlLength: scrapeData.html.length,
-        preview: scrapeData.html.substring(0, 200),
+        selector,
+        format: markdown ? 'markdown' : 'html',
+        contentLength: content.length,
+        content,
         method: 'scrapeowl'
       });
     } else {
