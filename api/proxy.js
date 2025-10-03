@@ -1,8 +1,8 @@
 // /api/proxy.js
-import * as cheerio from 'cheerio';
-import TurndownService from 'turndown';
+const cheerio = require('cheerio');
+const TurndownService = require('turndown');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -19,10 +19,14 @@ export default async function handler(req, res) {
   }
   
   try {
+    const fullUrl = `https://helpx.adobe.com/${url}`;
+    console.log('Attempting to fetch:', fullUrl);
+    
     // Fetch the Adobe page
-    const response = await fetch(`https://helpx.adobe.com/${url}`, {
+    const response = await fetch(fullUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Adobe Internal Tool)'
+        'User-Agent': 'Mozilla/5.0 (compatible; Adobe Internal Tool)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     });
     
@@ -72,4 +76,4 @@ export default async function handler(req, res) {
       url: `https://helpx.adobe.com/${url}`
     });
   }
-}
+};
