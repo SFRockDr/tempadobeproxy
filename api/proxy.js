@@ -71,6 +71,23 @@ export default async function handler(req, res) {
         
         content = turndown.turndown(content);
         
+        // Cut off content at common footer sections
+        const cutoffPatterns = [
+          /^## Have a question or an idea.*/ms,
+          /^## More like this.*/ms,
+          /^### Talk to us.*/ms,
+          /^Have a question or an idea.*/ms,
+          /^More like this.*/ms
+        ];
+        
+        for (const pattern of cutoffPatterns) {
+          const match = content.match(pattern);
+          if (match) {
+            content = content.substring(0, match.index).trim();
+            break;
+          }
+        }
+        
         // Clean up and normalize formatting
         content = content.replace(/^#[^\n]*\{[^}]*\}$/gm, ''); // Remove CSS blocks
         content = content.replace(/!\[.*?\]\(.*?\)/g, ''); // Remove markdown images
