@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url, markdown } = req.query;
+  const { url } = req.query; // Removed markdown parameter since it's no longer used
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
@@ -59,53 +59,54 @@ export default async function handler(req, res) {
       
       let content = contentElement.html();
       
-      // Convert to markdown if requested
-      if (markdown) {
-        const turndown = new TurndownService({
-          headingStyle: 'atx',
-          codeBlockStyle: 'fenced',
-          bulletListMarker: '-',
-          // Remove style tags, scripts, and images
-          remove: ['style', 'script', 'img', 'picture', 'iframe']
-        });
-        
-        content = turndown.turndown(content);
-        
-        // Cut off content at common footer sections
-        const cutoffPatterns = [
-          /^## Have a question or an idea.*/ms,
-          /^## More like this.*/ms,
-          /^### Talk to us.*/ms,
-          /^Have a question or an idea.*/ms,
-          /^More like this.*/ms
-        ];
-        
-        for (const pattern of cutoffPatterns) {
-          const match = content.match(pattern);
-          if (match) {
-            content = content.substring(0, match.index).trim();
-            break;
-          }
+      // Always convert to plain text (no more markdown parameter)
+      const turndown = new TurndownService({
+        headingStyle: 'atx',
+        codeBlockStyle: 'fenced',
+        bulletListMarker: '-',
+        // Remove style tags, scripts, and images
+        remove: ['style', 'script', 'img', 'picture', 'iframe']
+      });
+      
+      content = turndown.turndown(content);
+      
+      // Cut off content at common footer sections
+      const cutoffPatterns = [
+        /^## Have a question or an idea.*/ms,
+        /^## More like this.*/ms,
+        /^### Talk to us.*/ms,
+        /^### Related resources.*/ms, // New cutoff pattern
+        /^Have a question or an idea.*/ms,
+        /^More like this.*/ms
+      ];
+      
+      for (const pattern of cutoffPatterns) {
+        const match = content.match(pattern);
+        if (match) {
+          content = content.substring(0, match.index).trim();
+          break;
         }
-        
-        // Convert markdown to plain text with explicit separators
-        content = content.replace(/^#+ (.+)$/gm, '\n\n--- $1 ---\n\n'); // Convert headers to section dividers
-        content = content.replace(/^\* (.+)$/gm, '• $1'); // Convert bullet points
-        content = content.replace(/^\d+\. (.+)$/gm, '$1'); // Remove numbering, keep text
-        content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Remove markdown links, keep text
-        content = content.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold markdown
-        content = content.replace(/\*([^*]+)\*/g, '$1'); // Remove italic markdown
-        content = content.replace(/`([^`]+)`/g, '$1'); // Remove code markdown
-        
-        // Clean up spacing
-        content = content.replace(/\n{3,}/g, '\n\n'); // Collapse excessive newlines
-        content = content.replace(/^\s+|\s+$/g, ''); // Trim whitespace
-        
-        // Replace newlines with space for systems that strip formatting
-        content = content.replace(/\n/g, ' ');
-        content = content.replace(/\s+/g, ' '); // Normalize multiple spaces
-        
       }
+      
+      // Convert markdown to plain text with explicit separators
+      content = content.replace(/^#+ (.+)$/gm, '\n\n--- $1 ---\n\n'); // Convert headers to section dividers
+      content = content.replace(/^\* (.+)$/gm, '• $1'); // Convert bullet points
+      content = content.replace(/^\d+\. (.+)$/gm, '$1'); // Remove numbering, keep text
+      content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Remove markdown links, keep text
+      content = content.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold markdown
+      content = content.replace(/\*([^*]+)\*/g, '$1'); // Remove italic markdown
+      content = content.replace(/`([^`]+)`/g, '$1'); // Remove code markdown
+      
+      // Clean up spacing
+      content = content.replace(/\n{3,}/g, '\n\n'); // Collapse excessive newlines
+      content = content.replace(/^\s+|\s+$/g, ''); // Trim whitespace
+      
+      // Replace newlines with space for systems that strip formatting
+      content = content.replace(/\n/g, ' ');
+      content = content.replace(/\s+/g, ' '); // Normalize multiple spaces
+      
+      // Add leading space at the very beginning
+      content = ' ' + content;
       
       // Return simplified payload - just the clean text content
       return res.json({ 
