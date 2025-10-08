@@ -210,7 +210,8 @@ export default async function handler(req, res) {
           headerText.includes('have a question') ||
           headerText.includes('related resources') ||
           headerText.includes('share this page') ||
-          headerText.includes('was this helpful') {
+          headerText.includes('was this helpful') ||
+          headerHtml.includes('sectiontitle')) {
         
         console.log(`Found footer cutoff at: ${headerText}`);
         // Remove this header and everything after it in the parent container
