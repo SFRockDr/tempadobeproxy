@@ -284,6 +284,32 @@ export default async function handler(req, res) {
       // Return plain text response
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       return res.send(textResponse);
+      
+    } else if (format === 'markdown') {
+      // Pure markdown with YAML front matter
+      let markdownResponse = '---\n';
+      markdownResponse += `title: "${title.replace(/"/g, '\\"')}"\n`;
+      
+      if (seoTitle && seoTitle !== title) {
+        markdownResponse += `seoTitle: "${seoTitle.replace(/"/g, '\\"')}"\n`;
+      }
+      
+      if (seoDescription) {
+        markdownResponse += `description: "${seoDescription.replace(/"/g, '\\"')}"\n`;
+      }
+      
+      if (publishDate) {
+        markdownResponse += `publishDate: "${publishDate}"\n`;
+      }
+      
+      markdownResponse += `url: "${fullUrl}"\n`;
+      markdownResponse += '---\n\n';
+      markdownResponse += content;
+      
+      // Return markdown response
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+      return res.send(markdownResponse);
+      
     } else {
       // Default JSON response
       const response = { 
