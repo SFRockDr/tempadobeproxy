@@ -196,17 +196,27 @@ export default async function handler(req, res) {
       div:empty, p:empty, span:empty
     `).remove();
     
-    // Remove footer-style content before conversion
-    contentElement.find('h2, h3, h4').each(function() {
-      const headerText = $(this).text().toLowerCase();
+    // Remove footer-style content before conversion - HARD CUTOFF
+    let cutoffFound = false;
+    contentElement.find('h1, h2, h3, h4, h5, h6').each(function() {
+      if (cutoffFound) return;
+      
+      const headerText = $(this).text().toLowerCase().trim();
+      const headerHtml = $(this).html().toLowerCase();
+      
+      // Check for footer indicators
       if (headerText.includes('more like this') || 
           headerText.includes('talk to us') ||
           headerText.includes('have a question') ||
           headerText.includes('related resources') ||
-          headerText.includes('share this page')) {
-        // Remove this header and everything after it
+          headerText.includes('share this page') ||
+          headerText.includes('was this helpful') {
+        
+        console.log(`Found footer cutoff at: ${headerText}`);
+        // Remove this header and everything after it in the parent container
         $(this).nextAll().remove();
         $(this).remove();
+        cutoffFound = true;
       }
     });
 
@@ -222,33 +232,14 @@ export default async function handler(req, res) {
 
     content = turndown.turndown(content);
 
-    // Clean up footer sections - expanded patterns
+    // Clean up any remaining footer sections in markdown (minimal patterns)
     const footerCutoffPatterns = [
-      // Standard Adobe Help footer patterns
       /^#{1,6}\s*Have a question or an idea.*/ms,
       /^#{1,6}\s*More like this.*/ms,
-      /^#{1,6}\s*Share this page.*/ms,
-      /^#{1,6}\s*Was this page helpful.*/ms,
       /^#{1,6}\s*Talk to us.*/ms,
-      /^#{1,6}\s*Related resources.*/ms,
-      
-      // Without heading markers
-      /^Have a question or an idea.*/ms,
       /^More like this.*/ms,
-      /^Share this page.*/ms,
       /^Talk to us.*/ms,
-      /^Related topics.*/ms,
-      /^See also.*/ms,
-      /^Related resources.*/ms,
-      
-      // HTML patterns that might leak through
-      /<h[1-6][^>]*>.*More like this.*<\/h[1-6]>/ms,
-      /<h[1-6][^>]*>.*Talk to us.*<\/h[1-6]>/ms,
-      /<h[1-6][^>]*>.*Have a question.*<\/h[1-6]>/ms,
-      
-      // Span variations
-      /More like this<\/span>/ms,
-      /Talk to us<\/span>/ms
+      /^Have a question.*/ms
     ];
 
     for (const pattern of footerCutoffPatterns) {
