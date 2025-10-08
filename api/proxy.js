@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { url, markdown, debug } = req.query;
+  const { url, format = 'json', debug } = req.query;
   
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
@@ -66,12 +66,6 @@ export default async function handler(req, res) {
                        $('meta[name="firstPublishedLive"]').attr('content') ||
                        $('meta[property="article:published_time"]').attr('content') ||
                        '';
-
-    // Extract other useful metadata
-    const keywords = $('meta[name="keywords"]').attr('content') || '';
-    const contentType = $('meta[name="content-type"]').attr('content') || '';
-    const primaryProduct = $('meta[name="primaryProduct"]').attr('content') || 
-                           $('meta[name="primaryProductName"]').attr('content') || '';
 
     // Detect template type and extract content accordingly
     let contentElement;
@@ -233,8 +227,10 @@ export default async function handler(req, res) {
     }
 
     // Format output based on preference
-    if (!markdown) {
-      // Convert to plain text
+    let outputAsMarkdown = (format === 'markdown');
+    
+    if (!outputAsMarkdown) {
+      // Convert to plain text for both 'json' and 'text' formats
       content = content
         .replace(/^#{1,6}\s+(.+)$/gm, '\n\n--- $1 ---\n\n')
         .replace(/^\* (.+)$/gm, '• $1')
@@ -250,6 +246,7 @@ export default async function handler(req, res) {
       
       content = ' ' + content;
     } else {
+      // Keep as markdown
       content = content
         .replace(/\n{3,}/g, '\n\n')
         .replace(/^\s+|\s+$/g, '');
@@ -265,32 +262,54 @@ export default async function handler(req, res) {
       });
     }
 
-    const response = { 
-      title: title.substring(0, 200),
-      content: content,
-      metadata: {
-        seoTitle: seoTitle.substring(0, 300),
-        seoDescription: seoDescription.substring(0, 500),
-        publishDate: publishDate,
-        keywords: keywords.substring(0, 200),
-        contentType: contentType,
-        primaryProduct: primaryProduct
+    // Build response based on requested format
+    if (format === 'text') {
+      // Pure text response for RAG systems
+      let textResponse = `TITLE: ${title}\n\n`;
+      
+      if (seoTitle && seoTitle !== title) {
+        textResponse += `SEO TITLE: ${seoTitle}\n\n`;
       }
-    };
-
-    if (debug) {
-      response.debug = {
-        templateType,
-        finalTextLength,
-        url: fullUrl,
-        helpNextIndicators,
-        legacyHelpXIndicators,
-        contentFoundLength: contentElement ? contentElement.length : 0,
-        rawContentLength: contentElement ? contentElement.text().length : 0
+      
+      if (seoDescription) {
+        textResponse += `DESCRIPTION: ${seoDescription}\n\n`;
+      }
+      
+      if (publishDate) {
+        textResponse += `PUBLISHED: ${publishDate}\n\n`;
+      }
+      
+      textResponse += `CONTENT:\n${content}`;
+      
+      // Return plain text response
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.send(textResponse);
+    } else {
+      // Default JSON response
+      const response = { 
+        title: title.substring(0, 200),
+        metadata: {
+          seoTitle: seoTitle.substring(0, 300),
+          seoDescription: seoDescription.substring(0, 500),
+          publishDate: publishDate
+        },
+        content: content
       };
-    }
 
-    return res.json(response);
+      if (debug) {
+        response.debug = {
+          templateType,
+          finalTextLength,
+          url: fullUrl,
+          helpNextIndicators,
+          legacyHelpXIndicators,
+          contentFoundLength: contentElement ? contentElement.length : 0,
+          rawContentLength: contentElement ? contentElement.text().length : 0
+        };
+      }
+
+      return res.json(response);
+    }
     
   } catch (error) {
     console.error('Proxy error:', error);
