@@ -356,13 +356,16 @@ export default async function handler(req, res) {
         const firstHasTH = Array.from(node.querySelectorAll('tr')[0]?.children || [])
         .some(c => c.nodeName === 'TH');
 
-        const header = firstHasTH ? rows[0] : rows[0].map((_, i) => `Column ${i+1}`);
+        const header = firstHasTH ? rows[0] : [];
         const body = firstHasTH ? rows.slice(1) : rows;
 
         const pad = (cells) => `| ${cells.join(' | ')} |`;
         const sep  = `| ${header.map(() => '---').join(' | ')} |`;
 
-        const md = [pad(header), sep, ...body.map(pad)].join('\n');
+        const md = header.length
+          ? [pad(header), sep, ...body.map(pad)].join('\n')
+          : body.map(pad).join('\n');
+
         return `\n\n${md}\n\n`;
     }
     });
