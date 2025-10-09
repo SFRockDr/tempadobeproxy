@@ -96,18 +96,31 @@ export default async function handler(req, res) {
       });
     }
 
+    // Extract and preserve xfreference content BEFORE general cleanup
+    const xfReferenceContent = [];
+    contentElement.find('.xfreference.experiencefragment').each(function() {
+    const $this = $(this);
+    // Get the content and mark it for preservation
+    const xfContent = $this.html();
+    if (xfContent && xfContent.trim()) {
+        xfReferenceContent.push(xfContent);
+    }
+    // Replace the element with a placeholder
+    $this.replaceWith(`<!--XF_REFERENCE_${xfReferenceContent.length - 1}-->`);
+    });
+
     // Universal cleanup - remove navigation, images, and UI elements
     contentElement.find(`
-      nav, .nav, .toc, .TableOfContents, .breadcrumb, .search, 
-      .titleBar, .globalnavheader, .globalNavHeader, .globalnavfooter,
-      .xfreference, .experiencefragment, .feedbackV2, .socialmediashare,
-      .pagenavigationarrows, .lastUpdated, .planCard, .productbadge,
-      .sidebar, .actionItems, .rightRailXf, .HelpX_Personalization,
-      img, picture, .image, video, iframe, svg,
-      style, script, .dexter-Spacer, .viewportSpecificContainer,
-      .feedback, .evidon-notice-link, .internalBanner,
-      div:empty, p:empty, span:empty
-    `).remove();
+    nav, .nav, .toc, .TableOfContents, .breadcrumb, .search, 
+    .titleBar, .globalnavheader, .globalNavHeader, .globalnavfooter,
+    .feedbackV2, .socialmediashare,
+    .pagenavigationarrows, .lastUpdated, .planCard, .productbadge,
+    .sidebar, .actionItems, .rightRailXf, .HelpX_Personalization,
+    img, picture, .image, video, iframe, svg,
+    style, script, .dexter-Spacer, .viewportSpecificContainer,
+    .feedback, .evidon-notice-link, .internalBanner,
+    div:empty, p:empty, span:empty
+    `).remove();    
     
     // Remove footer-style content - hard cutoff at common footer headers
     let cutoffFound = false;
@@ -131,7 +144,15 @@ export default async function handler(req, res) {
     });
 
     let content = contentElement.html();
-    
+
+    // Restore xfreference content
+    xfReferenceContent.forEach((xfContent, index) => {
+    content = content.replace(
+        `<!--XF_REFERENCE_${index}-->`,
+        xfContent
+    );
+    });
+
     // Convert to markdown
     const turndown = new TurndownService({
       headingStyle: 'atx',
@@ -264,3 +285,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
