@@ -194,8 +194,8 @@ export default async function handler(req, res) {
     // Format output based on preference
     let outputAsMarkdown = (format === 'markdown');
     
-    if (!outputAsMarkdown) {
-      // Convert to plain text
+if (!outputAsMarkdown) {
+      // Convert to plain text - keep paragraph breaks
       content = content
         .replace(/^#{1,6}\s+(.+)$/gm, '\n\n--- $1 ---\n\n')
         .replace(/^\* (.+)$/gm, '• $1')
@@ -204,10 +204,8 @@ export default async function handler(req, res) {
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/\*([^*]+)\*/g, '$1')
         .replace(/`([^`]+)`/g, '$1')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/^\s+|\s+$/g, '')
-        .replace(/\n/g, ' ')
-        .replace(/\s+/g, ' ');
+        .replace(/\n{3,}/g, '\n\n')  // Normalize to double line breaks
+        .replace(/^\s+|\s+$/g, '');
       
       content = ' ' + content;
     } else {
