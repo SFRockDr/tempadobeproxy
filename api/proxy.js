@@ -2,12 +2,8 @@
 import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
 
-import { gfm, tables, strikethrough, taskListItems } from 'turndown-plugin-gfm';
-
-turndown.use([gfm, tables, strikethrough, taskListItems]);
-
-// preserve <br> as hard breaks
-turndown.keep(['br']);
+// replace the named import with:
+import gfmPlugin from 'turndown-plugin-gfm';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -211,6 +207,11 @@ export default async function handler(req, res) {
       bulletListMarker: '-',
       remove: ['style', 'script', 'img', 'picture', 'iframe', 'svg']
     });
+
+    // Enable GitHub Flavored Markdown (GFM)
+    const { gfm, tables, strikethrough, taskListItems } = gfmPlugin;
+    turndown.use([gfm, tables, strikethrough, taskListItems]);
+    turndown.keep(['br']); // preserve <br> as hard line breaks
 
     $content('a[href]').each(function () {
     const a = $content(this);
