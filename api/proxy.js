@@ -435,6 +435,26 @@ export default async function handler(req, res) {
         }
     );
 
+    // Also flatten pipe tables that lack a header separator line
+    content = content.replace(
+    /\n\|([^\n]+?)\|\n((?:\|[^\n]*\|\n?)+)(?=\n{2,}|$)/g,
+    (match, header, body) => {
+        const headers = header.split('|').map(h => h.trim()).filter(Boolean);
+        const rows = body.trim().split('\n').map(r =>
+        r.replace(/^\s*\|\s*|\s*\|\s*$/g, '').split('|').map(c => c.trim())
+        ).filter(cells => cells.some(Boolean));
+
+        const lines = rows.map(cells => {
+        return headers.length
+            ? headers.map((h, i) => `${h}: ${cells[i] ?? ''}`).join('\n')
+            : cells.join(' | ');
+        });
+
+        return '\n' + lines.join('\n') + '\n';
+    }
+    );
+
+
     let textResponse = `TITLE: ${title}\n\n`;
     if (seoTitle && seoTitle !== title) textResponse += `SEO TITLE: ${seoTitle}\n\n`;
     if (seoDescription) textResponse += `DESCRIPTION: ${seoDescription}\n\n`;
