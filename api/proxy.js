@@ -431,7 +431,7 @@ export default async function handler(req, res) {
             return cells.join(' | ');
         });
 
-        return '\n' + lines.join('\n') + '\n';
+        return '\n' + lines.map(l => l.replace(/ \|\s/g, '\n')).join('\n') + '\n';
         }
     );
 
