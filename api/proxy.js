@@ -166,6 +166,20 @@ export default async function handler(req, res) {
     );
     });
 
+    // Transform helpx-note elements into custom format
+    const $content = cheerio.load(content);
+    $content('.helpx-note').each(function() {
+      const $note = $content(this);
+      const noteTitle = $note.find('.note-title').text().trim() || 'Note';
+      const noteText = $note.find('.cmp-text, p').text().trim();
+      
+      // Replace with formatted version
+      if (noteText) {
+        $note.replaceWith(`<p><strong>${noteTitle}:</strong> ${noteText}</p>`);
+      }
+    });
+    content = $content.html();
+    
     // Convert to markdown
     const turndown = new TurndownService({
       headingStyle: 'atx',
