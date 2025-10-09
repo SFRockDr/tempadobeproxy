@@ -237,17 +237,6 @@ export default async function handler(req, res) {
       }
     });
 
-    // Convert to Markdown (Turndown + GFM)
-    const turndown = new TurndownService({
-      headingStyle: 'atx',
-      codeBlockStyle: 'fenced',
-      bulletListMarker: '-'
-      // unknown options like `remove` are ignored by Turndown
-    });
-    const { gfm, tables, strikethrough, taskListItems } = gfmPlugin;
-    turndown.use([gfm, tables, strikethrough, taskListItems]);
-    turndown.keep(['br']); // preserve <br> as hard line breaks
-
     // --- Hoist tables out of list items so GFM table → Markdown works ---
     $content('li table').each(function () {
     const $table = $content(this);
@@ -263,6 +252,17 @@ export default async function handler(req, res) {
     }
     });
 
+    // Convert to Markdown (Turndown + GFM)
+    const turndown = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-'
+      // unknown options like `remove` are ignored by Turndown
+    });
+    const { gfm, tables, strikethrough, taskListItems } = gfmPlugin;
+    turndown.use([gfm, tables, strikethrough, taskListItems]);
+    turndown.keep(['br']); // preserve <br> as hard line breaks
+
     // (nice-to-have) simplify heavy table markup so cells convert cleanly
     $content('table').each(function () {
     const t = $content(this);
@@ -272,6 +272,13 @@ export default async function handler(req, res) {
         const el = $content(this);
         if (!el.children().length) el.replaceWith(el.text());
     });
+    });
+
+    // Add blank lines before/after tables to help Markdown parsers
+    $content('table').each(function () {
+    const tbl = $content(this);
+    tbl.before('\n\n');
+    tbl.after('\n\n');
     });
 
     let content = turndown.turndown($content.html() || '');
