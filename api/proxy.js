@@ -240,10 +240,11 @@ export default async function handler(req, res) {
     // --- Hoist tables out of list items so GFM table → Markdown works ---
     $content('li table').each(function () {
     const $table = $content(this);
+   
     const $li = $table.closest('li');
-
-    // Move the table to be a sibling after the <li>, not a child
-    $table.insertAfter($li);
+    const $list = $li.parent();
+    // Move the table to be a sibling after the entire list, preserving order
+    $list.after($table);
 
     // Optional: leave a hint inside the list item
     const txt = $li.text().trim();
@@ -251,6 +252,75 @@ export default async function handler(req, res) {
         $li.append(' — see table below.');
     }
     });
+
+    // --- Normalize tables so GFM converter can emit Markdown tables ---
+    function normalizeTables($content) {
+    // 1) Unwrap trivial wrappers inside cells
+    $content('table').each(function () {
+        const t = $content(this);
+        t.removeAttr('class width border cellpadding cellspacing style');
+        t.find('thead, tbody').each(function () {
+        const el = $content(this);
+        // unwrap <tbody>/<thead> so rows are direct children (simplifies DOM)
+        el.replaceWith(el.html());
+        });
+
+        // 2) For every cell, convert blocks to inline with <br> separators
+        t.find('th, td').each(function () {
+        const cell = $content(this);
+
+        // lists -> bullet lines with <br>
+        cell.find('ul, ol').each(function () {
+            const list = $content(this);
+            const bullet = list.is('ol') ? (i) => `${i + 1}. ` : () => '• ';
+            const lines = [];
+            list.children('li').each(function (i) {
+            const liText = $content(this).text().trim();
+            if (liText) lines.push(bullet(i) + liText);
+            });
+            list.replaceWith(lines.length ? lines.join('<br>') : '');
+        });
+
+        // paragraphs -> joined with <br>
+        cell.find('p').each(function () {
+            const p = $content(this);
+            const txt = p.text().trim();
+            p.replaceWith(txt ? `${txt}<br>` : '');
+        });
+
+        // trivial div/span wrappers -> keep text
+        cell.find('div, span').each(function () {
+            const el = $content(this);
+            if (!el.children().length) el.replaceWith(el.text());
+        });
+
+        // collapse multiple <br> to single
+        cell.html((cell.html() || '').replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br>'));
+
+        // 3) Escape pipes so GFM doesn’t split columns inside text
+        const plain = cell.html() || '';
+        cell.html(
+            plain
+            // encode literal '|' that aren’t part of HTML
+            .replace(/(?<!<[^>]{0,200})\|/g, '\\|')
+            // remove leftover non-breaking spaces that confuse widths
+            .replace(/&nbsp;/g, ' ')
+        );
+
+        // 4) Trim ending <br>
+        cell.html((cell.html() || '').replace(/(<br\s*\/?>\s*)+$/i, ''));
+        });
+    });
+
+    // add padding newlines so Markdown parsers recognize the table block
+    $content('table').each(function () {
+        const tbl = $content(this);
+        tbl.before('\n\n');
+        tbl.after('\n\n');
+    });
+    }
+
+    normalizeTables($content);
 
     // Convert to Markdown (Turndown + GFM)
     const turndown = new TurndownService({
@@ -262,17 +332,6 @@ export default async function handler(req, res) {
     const { gfm, tables, strikethrough, taskListItems } = gfmPlugin;
     turndown.use([gfm, tables, strikethrough, taskListItems]);
     turndown.keep(['br']); // preserve <br> as hard line breaks
-
-    // (nice-to-have) simplify heavy table markup so cells convert cleanly
-    $content('table').each(function () {
-    const t = $content(this);
-    t.removeAttr('class width border');
-    // flatten trivial wrappers inside cells
-    t.find('td div, td span').each(function () {
-        const el = $content(this);
-        if (!el.children().length) el.replaceWith(el.text());
-    });
-    });
 
     // Add blank lines before/after tables to help Markdown parsers
     $content('table').each(function () {
