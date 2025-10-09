@@ -242,9 +242,7 @@ export default async function handler(req, res) {
     const $table = $content(this);
    
     const $li = $table.closest('li');
-    const $list = $li.parent();
-    // Move the table to be a sibling after the entire list, preserving order
-    $list.after($table);
+    $table.insertAfter($li); // keeps per-item order
 
     // Optional: leave a hint inside the list item
     const txt = $li.text().trim();
@@ -258,7 +256,8 @@ export default async function handler(req, res) {
     // 1) Unwrap trivial wrappers inside cells
     $content('table').each(function () {
         const t = $content(this);
-        t.removeAttr('class width border cellpadding cellspacing style');
+        ['class','width','border','cellpadding','cellspacing','style']
+            .forEach(a => t.removeAttr(a));
         t.find('thead, tbody').each(function () {
         const el = $content(this);
         // unwrap <tbody>/<thead> so rows are direct children (simplifies DOM)
@@ -302,7 +301,7 @@ export default async function handler(req, res) {
         cell.html(
             plain
             // encode literal '|' that aren’t part of HTML
-            .replace(/(?<!<[^>]{0,200})\|/g, '\\|')
+            .replace(/\|/g, '\\|')
             // remove leftover non-breaking spaces that confuse widths
             .replace(/&nbsp;/g, ' ')
         );
@@ -329,8 +328,49 @@ export default async function handler(req, res) {
       bulletListMarker: '-'
       // unknown options like `remove` are ignored by Turndown
     });
-    const { gfm, tables, strikethrough, taskListItems } = gfmPlugin;
-    turndown.use([gfm, tables, strikethrough, taskListItems]);
+
+    // custom Turndown rule that converts any residual <table> to a pipe table
+    turndown.addRule('pipeTablesForce', {
+    filter: function (node) {
+        return node.nodeName === 'TABLE';
+    },
+    replacement: function (content, node) {
+        // Collect rows
+        const rows = Array.from(node.querySelectorAll('tr')).map(tr =>
+        Array.from(tr.children)
+            .filter(td => td.nodeName === 'TD' || td.nodeName === 'TH')
+            .map(td => {
+            // cell text: collapse whitespace, strip inner tags
+            const txt = td.textContent
+                .replace(/\u00A0/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            // escape pipes
+            return txt.replace(/\|/g, '\\|');
+            })
+        ).filter(cells => cells.length);
+
+        if (!rows.length) return '\n\n'; // nothing useful
+
+        // Header = first row if it contains any TH; else synthesize from first row
+        const firstHasTH = Array.from(node.querySelectorAll('tr')[0]?.children || [])
+        .some(c => c.nodeName === 'TH');
+
+        const header = firstHasTH ? rows[0] : rows[0].map((_, i) => `Column ${i+1}`);
+        const body = firstHasTH ? rows.slice(1) : rows;
+
+        const pad = (cells) => `| ${cells.join(' | ')} |`;
+        const sep  = `| ${header.map(() => '---').join(' | ')} |`;
+
+        const md = [pad(header), sep, ...body.map(pad)].join('\n');
+        return `\n\n${md}\n\n`;
+    }
+    });
+
+
+    const { strikethrough, taskListItems } = gfmPlugin;
+    turndown.use([strikethrough, taskListItems]); // no table rule from plugin
+
     turndown.keep(['br']); // preserve <br> as hard line breaks
 
     let content = turndown.turndown($content.html() || '');
