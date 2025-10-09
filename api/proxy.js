@@ -248,6 +248,32 @@ export default async function handler(req, res) {
     turndown.use([gfm, tables, strikethrough, taskListItems]);
     turndown.keep(['br']); // preserve <br> as hard line breaks
 
+    // --- Hoist tables out of list items so GFM table → Markdown works ---
+    $content('li table').each(function () {
+    const $table = $content(this);
+    const $li = $table.closest('li');
+
+    // Move the table to be a sibling after the <li>, not a child
+    $table.insertAfter($li);
+
+    // Optional: leave a hint inside the list item
+    const txt = $li.text().trim();
+    if (!/table below\.?$/i.test(txt)) {
+        $li.append(' — see table below.');
+    }
+    });
+
+    // (nice-to-have) simplify heavy table markup so cells convert cleanly
+    $content('table').each(function () {
+    const t = $content(this);
+    t.removeAttr('class width border');
+    // flatten trivial wrappers inside cells
+    t.find('td div, td span').each(function () {
+        const el = $content(this);
+        if (!el.children().length) el.replaceWith(el.text());
+    });
+    });
+
     let content = turndown.turndown($content.html() || '');
     content = content.replace(/\n{3,}/g, '\n\n').trim();
 
