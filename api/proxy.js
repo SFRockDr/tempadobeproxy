@@ -49,7 +49,6 @@ export default async function handler(req, res) {
                 $('title').text().replace(/\s*[|\-].*$/i, '').trim() ||
                 'Untitled Article';
 
-    // Extract SEO metadata
     const seoTitle = $('meta[name="title"]').attr('content') || 
                      $('meta[property="og:title"]').attr('content') || 
                      $('title').text().trim() || 
@@ -59,7 +58,6 @@ export default async function handler(req, res) {
                           $('meta[property="og:description"]').attr('content') || 
                           '';
 
-    // Extract publish date - try multiple possible meta tag names
     const publishDate = $('meta[name="publishDate"]').attr('content') ||
                        $('meta[name="publishExternalUrl"]').attr('content') ||
                        $('meta[name="lastModifiedDate"]').attr('content') ||
@@ -67,154 +65,65 @@ export default async function handler(req, res) {
                        $('meta[property="article:published_time"]').attr('content') ||
                        '';
 
-    // Detect template type and extract content accordingly
+    // Detect template type
     let contentElement;
     let templateType;
+    const bodyClass = $('body').attr('class') || '';
 
-    // HelpNext template detection (Photoshop Web style)
-    const helpNextIndicators = $('#helpxNext-article-right-rail').length || 
-                               $('.helpxNext-article').length ||
-                               $('.titleBar parbase').length;
-
-    // Legacy HelpX template detection (InDesign FAQ style)  
-    const legacyHelpXIndicators = $('.helpxMain-article').length ||
-                                  $('#root_content_flex').length ||
-                                  $('.TableOfContents').length;
-
-    console.log(`Template detection: HelpNext=${helpNextIndicators}, LegacyHelpX=${legacyHelpXIndicators}`);
-
-    if (helpNextIndicators) {
+    if (bodyClass.includes('helpxNext-article')) {
       templateType = 'HelpNext';
       console.log('Detected HelpNext template');
+      contentElement = $('#helpxNext-article-right-rail .responsivegrid > .aem-Grid').first();
       
-      // For HelpNext, try to get the main article content area
-      let potentialElements = [
-        $('#helpxNext-article-right-rail .responsivegrid'),
-        $('.content .responsivegrid'),
-        $('main .responsivegrid'),
-        $('.aem-Grid .responsivegrid')
-      ];
-      
-      // Find the element with the most substantial text content
-      let bestElement = null;
-      let maxTextLength = 0;
-      
-      potentialElements.forEach((element, index) => {
-        if (element.length) {
-          // Create a copy and clean it up to test content quality
-          const testElement = element.clone();
-          testElement.find('nav, .toc, .breadcrumb, .search, .titleBar, .globalnavheader').remove();
-          const textLength = testElement.text().trim().length;
-          
-          console.log(`HelpNext selector ${index}: found ${element.length} elements, text length: ${textLength}`);
-          
-          if (textLength > maxTextLength && textLength > 200) {
-            maxTextLength = textLength;
-            bestElement = element;
-            console.log(`New best element found with ${textLength} characters`);
-          }
-        }
-      });
-      
-      if (bestElement && bestElement.length) {
-        contentElement = bestElement;
-        console.log(`Using HelpNext element with ${maxTextLength} characters`);
-      }
-      
-    } else if (legacyHelpXIndicators) {
+    } else if (bodyClass.includes('helpxMain-article')) {
       templateType = 'Legacy HelpX';
       console.log('Detected Legacy HelpX template');
+      contentElement = $('#root_content_flex_items_position .aem-Grid').first();
       
-      // Try Legacy HelpX-specific selectors in order of preference
-      const legacySelectors = [
-        '#root_content_flex_items_position .responsivegrid',
-        '.content .flex .position .responsivegrid',
-        'main .flex .position .responsivegrid',
-        '.titleBar ~ .flex .responsivegrid'
-      ];
-      
-      for (const selector of legacySelectors) {
-        const element = $(selector).first();
-        if (element.length && element.text().trim().length > 200) {
-          contentElement = element;
-          console.log(`Using Legacy selector: ${selector}`);
-          break;
-        }
-      }
-    }
-
-    // Fallback if template detection failed
-    if (!contentElement) {
-      templateType = 'Unknown - using fallback';
-      console.log('Template detection failed, using fallback selectors');
-      
-      const fallbackSelectors = [
-        '.dexter-FlexContainer-Items',
-        'main .responsivegrid', 
-        'main',
-        '.content'
-      ];
-      
-      for (const selector of fallbackSelectors) {
-        const element = $(selector).first();
-        if (element.length && element.text().trim().length > 100) {
-          contentElement = element;
-          console.log(`Using fallback selector: ${selector}`);
-          break;
-        }
-      }
+    } else {
+      templateType = 'Unknown';
+      console.log('Unknown template, attempting fallback');
+      // Fallback to generic selectors
+      contentElement = $('main .aem-Grid').first();
     }
 
     if (!contentElement || contentElement.length === 0) {
       return res.status(404).json({ 
         error: 'No suitable content found on this page',
         templateType,
+        bodyClass,
         url: fullUrl
       });
     }
 
-    // Template-specific cleanup
-    if (templateType === 'HelpNext') {
-      contentElement.find(`
-        .titleBar, .globalnavheader, .globalNavHeader, .flex_top_nav,
-        .xfreference, .experiencefragment, .feedbackV2, .socialmediashare, 
-        .pagenavigationarrows, .lastUpdated, .planCard
-      `).remove();
-    } else if (templateType === 'Legacy HelpX') {
-      contentElement.find(`
-        .TableOfContents, .helpxFooter, .internalBanner,
-        .rightRailXf, .HelpX_Personalization, .planCard
-      `).remove();
-    }
-    
-    // Universal cleanup for both templates
+    // Universal cleanup - remove navigation, images, and UI elements
     contentElement.find(`
-      nav, .nav, .toc, .breadcrumb, .search, .actionItems,
-      .sidebar, .productbadge, img, picture, .image, .video, iframe,
+      nav, .nav, .toc, .TableOfContents, .breadcrumb, .search, 
+      .titleBar, .globalnavheader, .globalNavHeader, .globalnavfooter,
+      .xfreference, .experiencefragment, .feedbackV2, .socialmediashare,
+      .pagenavigationarrows, .lastUpdated, .planCard, .productbadge,
+      .sidebar, .actionItems, .rightRailXf, .HelpX_Personalization,
+      img, picture, .image, video, iframe, svg,
       style, script, .dexter-Spacer, .viewportSpecificContainer,
-      .feedback, .globalnavfooter, .evidon-notice-link,
+      .feedback, .evidon-notice-link, .internalBanner,
       div:empty, p:empty, span:empty
     `).remove();
     
-    // Remove footer-style content before conversion - HARD CUTOFF
+    // Remove footer-style content - hard cutoff at common footer headers
     let cutoffFound = false;
     contentElement.find('h1, h2, h3, h4, h5, h6').each(function() {
       if (cutoffFound) return;
       
       const headerText = $(this).text().toLowerCase().trim();
-      const headerHtml = $(this).html().toLowerCase();
       
-      // Check for footer indicators
       if (headerText.includes('more like this') || 
           headerText.includes('talk to us') ||
           headerText.includes('have a question') ||
           headerText.includes('related resources') ||
           headerText.includes('share this page') ||
-          headerText.includes('was this helpful') ||
-          headerHtml.includes('sectiontitle')) {
+          headerText.includes('was this helpful')) {
         
         console.log(`Found footer cutoff at: ${headerText}`);
-        // Remove this header and everything after it in the parent container
         $(this).nextAll().remove();
         $(this).remove();
         cutoffFound = true;
@@ -233,14 +142,11 @@ export default async function handler(req, res) {
 
     content = turndown.turndown(content);
 
-    // Clean up any remaining footer sections in markdown (minimal patterns)
+    // Clean up markdown footer sections
     const footerCutoffPatterns = [
       /^#{1,6}\s*Have a question or an idea.*/ms,
       /^#{1,6}\s*More like this.*/ms,
-      /^#{1,6}\s*Talk to us.*/ms,
-      /^More like this.*/ms,
-      /^Talk to us.*/ms,
-      /^Have a question.*/ms
+      /^#{1,6}\s*Talk to us.*/ms
     ];
 
     for (const pattern of footerCutoffPatterns) {
@@ -255,7 +161,7 @@ export default async function handler(req, res) {
     let outputAsMarkdown = (format === 'markdown');
     
     if (!outputAsMarkdown) {
-      // Convert to plain text for both 'json' and 'text' formats
+      // Convert to plain text
       content = content
         .replace(/^#{1,6}\s+(.+)$/gm, '\n\n--- $1 ---\n\n')
         .replace(/^\* (.+)$/gm, '• $1')
@@ -289,49 +195,37 @@ export default async function handler(req, res) {
 
     // Build response based on requested format
     if (format === 'text') {
-      // Pure text response for RAG systems
       let textResponse = `TITLE: ${title}\n\n`;
-      
       if (seoTitle && seoTitle !== title) {
         textResponse += `SEO TITLE: ${seoTitle}\n\n`;
       }
-      
       if (seoDescription) {
         textResponse += `DESCRIPTION: ${seoDescription}\n\n`;
       }
-      
       if (publishDate) {
         textResponse += `PUBLISHED: ${publishDate}\n\n`;
       }
-      
       textResponse += `CONTENT:\n${content}`;
       
-      // Return plain text response
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       return res.send(textResponse);
       
     } else if (format === 'markdown') {
-      // Pure markdown with YAML front matter
       let markdownResponse = '---\n';
       markdownResponse += `title: "${title.replace(/"/g, '\\"')}"\n`;
-      
       if (seoTitle && seoTitle !== title) {
         markdownResponse += `seoTitle: "${seoTitle.replace(/"/g, '\\"')}"\n`;
       }
-      
       if (seoDescription) {
         markdownResponse += `description: "${seoDescription.replace(/"/g, '\\"')}"\n`;
       }
-      
       if (publishDate) {
         markdownResponse += `publishDate: "${publishDate}"\n`;
       }
-      
       markdownResponse += `url: "${fullUrl}"\n`;
       markdownResponse += '---\n\n';
       markdownResponse += content;
       
-      // Return markdown response
       res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
       return res.send(markdownResponse);
       
@@ -350,12 +244,12 @@ export default async function handler(req, res) {
       if (debug) {
         response.debug = {
           templateType,
+          bodyClass,
           finalTextLength,
           url: fullUrl,
-          helpNextIndicators,
-          legacyHelpXIndicators,
-          contentFoundLength: contentElement ? contentElement.length : 0,
-          rawContentLength: contentElement ? contentElement.text().length : 0
+          selectorUsed: templateType === 'HelpNext' 
+            ? '#helpxNext-article-right-rail .responsivegrid > .aem-Grid'
+            : '#root_content_flex_items_position .aem-Grid'
         };
       }
 
@@ -369,4 +263,4 @@ export default async function handler(req, res) {
       url: fullUrl
     });
   }
-};
+}
