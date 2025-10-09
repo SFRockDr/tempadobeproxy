@@ -421,7 +421,7 @@ export default async function handler(req, res) {
         const rows = body
             .trim()
             .split('\n')
-            .map(r => r.split('|').map(c => c.trim()))
+            .map(r => r.replace(/^\s*\|\s*|\s*\|\s*$/g, '').split('|').map(c => c.trim()))
             .filter(arr => arr.length);
 
         const lines = rows.map(cells => {
