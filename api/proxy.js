@@ -333,13 +333,6 @@ export default async function handler(req, res) {
     turndown.use([gfm, tables, strikethrough, taskListItems]);
     turndown.keep(['br']); // preserve <br> as hard line breaks
 
-    // Add blank lines before/after tables to help Markdown parsers
-    $content('table').each(function () {
-    const tbl = $content(this);
-    tbl.before('\n\n');
-    tbl.after('\n\n');
-    });
-
     let content = turndown.turndown($content.html() || '');
     content = content.replace(/\n{3,}/g, '\n\n').trim();
 
