@@ -404,12 +404,42 @@ export default async function handler(req, res) {
     }
 
     // Respond by requested format
+
     if (format === 'text') {
-      let textResponse = `TITLE: ${title}\n\n`;
-      if (seoTitle && seoTitle !== title) textResponse += `SEO TITLE: ${seoTitle}\n\n`;
-      if (seoDescription) textResponse += `DESCRIPTION: ${seoDescription}\n\n`;
-      if (publishDate) textResponse += `PUBLISHED: ${publishDate}\n\n`;
-      textResponse += `CONTENT:\n${content
+    // Flatten Markdown tables to line-based text for LLM ingestion
+    // Example:
+    // | Tool | Windows | Mac OS |
+    // | ---  | ---     | ---    |
+    // | Selection tool | V, Esc | V, Esc |
+    //
+    // becomes:
+    // Tool: Selection tool | Windows: V, Esc | Mac OS: V, Esc
+    content = content.replace(
+        /\n\|(.+?)\|\n\|(?:\s*[-:]+\s*\|)+\n([\s\S]+?)(?=\n{2,}|$)/g,
+        (match, header, body) => {
+        const headers = header.split('|').map(h => h.trim()).filter(Boolean);
+        const rows = body
+            .trim()
+            .split('\n')
+            .map(r => r.split('|').map(c => c.trim()).filter(Boolean))
+            .filter(arr => arr.length);
+
+        const lines = rows.map(cells => {
+            if (headers.length && cells.length === headers.length) {
+            return headers.map((h, i) => `${h}: ${cells[i]}`).join(' | ');
+            }
+            return cells.join(' | ');
+        });
+
+        return '\n' + lines.join('\n') + '\n';
+        }
+    );
+
+    let textResponse = `TITLE: ${title}\n\n`;
+    if (seoTitle && seoTitle !== title) textResponse += `SEO TITLE: ${seoTitle}\n\n`;
+    if (seoDescription) textResponse += `DESCRIPTION: ${seoDescription}\n\n`;
+    if (publishDate) textResponse += `PUBLISHED: ${publishDate}\n\n`;
+    textResponse += `CONTENT:\n${content
         .replace(/^#{1,6}\s+(.+)$/gm, '\n\n--- $1 ---\n\n')
         .replace(/^\* (.+)$/gm, '• $1')
         .replace(/^\d+\.\s+(.+)$/gm, '$1')
@@ -420,8 +450,8 @@ export default async function handler(req, res) {
         .replace(/\n{3,}/g, '\n\n')
         .trim()}`;
 
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      return res.send(textResponse);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.send(textResponse);
     }
 
     if (format === 'markdown') {
