@@ -99,14 +99,27 @@ export default async function handler(req, res) {
     // Extract and preserve xfreference content BEFORE general cleanup
     const xfReferenceContent = [];
     contentElement.find('.xfreference.experiencefragment').each(function() {
-    const $this = $(this);
-    // Get the content and mark it for preservation
-    const xfContent = $this.html();
-    if (xfContent && xfContent.trim()) {
+      const $this = $(this);
+      
+      // Clone the element so we can clean it without affecting the original yet
+      const $clone = $this.clone();
+      
+      // Clean up the cloned content
+      $clone.find('style, script, img, picture, iframe, svg').remove();
+      $clone.find('[class*="dexter-"]').removeAttr('class');
+      $clone.find('[id]').removeAttr('id');
+      $clone.find('[style]').removeAttr('style');
+      
+      // Get the cleaned content
+      const xfContent = $clone.html();
+      if (xfContent && xfContent.trim()) {
         xfReferenceContent.push(xfContent);
-    }
-    // Replace the element with a placeholder
-    $this.replaceWith(`<!--XF_REFERENCE_${xfReferenceContent.length - 1}-->`);
+        // Replace the original element with a placeholder
+        $this.replaceWith(`<!--XF_REFERENCE_${xfReferenceContent.length - 1}-->`);
+      } else {
+        // If nothing left after cleanup, just remove it
+        $this.remove();
+      }
     });
 
     // Universal cleanup - remove navigation, images, and UI elements
